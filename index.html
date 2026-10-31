@@ -1,0 +1,661 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#7c5cff">
+<title>Creatore di storie</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<style>
+  :root { --bg:#fff8ec; --card:#ffffff; --ink:#2b2140; --accent:#7c5cff; --soft:#ece6ff; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; }
+  header { padding:16px; text-align:center; font-weight:700; font-size:1.3rem; }
+  main { max-width:640px; margin:0 auto; padding:0 16px 40px; }
+  .card { background:var(--card); border-radius:20px; padding:20px; box-shadow:0 4px 14px rgba(43,33,64,.08); margin-bottom:16px; }
+  h2 { margin:0 0 6px; font-size:1.35rem; }
+  .sub { color:#6b6280; margin:0 0 14px; font-size:.95rem; }
+  .choices { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; }
+  .choice { background:var(--soft); border:none; border-radius:16px; padding:14px 8px; font-size:1rem; cursor:pointer; color:var(--ink); }
+  .choice .emo { display:block; font-size:2.4rem; margin-bottom:4px; }
+  .choice.selected { background:var(--accent); color:#fff; }
+  input[type=text] { width:100%; font-size:1.1rem; padding:12px; border-radius:12px; border:2px solid var(--soft); }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+  .chip { background:var(--soft); border:none; border-radius:14px; padding:10px 14px; font-size:1rem; cursor:pointer; color:var(--ink); }
+  .chip.selected { background:var(--accent); color:#fff; }
+  .row { display:flex; gap:10px; justify-content:space-between; margin-top:16px; flex-wrap:wrap; align-items:center; }
+  button.primary { background:var(--accent); color:#fff; border:none; border-radius:14px; padding:12px 18px; font-size:1rem; cursor:pointer; }
+  button.ghost { background:transparent; color:var(--accent); border:2px solid var(--accent); border-radius:14px; padding:10px 16px; font-size:1rem; cursor:pointer; }
+  button.danger { background:#fff; color:#c0392b; border:2px solid #c0392b; border-radius:14px; padding:8px 12px; cursor:pointer; }
+  .progress { height:8px; background:var(--soft); border-radius:8px; overflow:hidden; margin-bottom:16px; }
+  .progress > div { height:100%; background:var(--accent); transition:width .3s; }
+  .page { text-align:left; min-height:300px; }
+  .page .big { font-size:3.5rem; text-align:center; margin:4px 0 12px; }
+  .page p { font-size:1.2rem; line-height:1.6; margin:0 0 14px; }
+  .lang { display:inline-flex; background:var(--soft); border-radius:12px; overflow:hidden; }
+  .lang button { border:none; background:transparent; padding:8px 14px; cursor:pointer; font-size:.95rem; color:var(--ink); }
+  .lang button.on { background:var(--accent); color:#fff; }
+  .list-item { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 0; border-bottom:1px solid var(--soft); }
+  .list-item span { cursor:pointer; flex:1; font-weight:600; }
+  .hidden { display:none; }
+  .tiny { font-size:.85rem; color:#6b6280; }
+</style>
+</head>
+<body>
+<header>📖 Creatore di storie <span class="tiny">v6</span></header>
+<main>
+
+  <!-- HOME -->
+  <section id="home" class="card">
+    <h2>Che storia creiamo?</h2>
+    <p class="sub">Rispondi alle domande: la storia si costruisce con le tue scelte.</p>
+    <div class="row">
+      <button class="primary" id="btnNew">✨ Nuova storia</button>
+      <button class="ghost" id="btnLibrary">📚 Le mie storie</button>
+    </div>
+    <div class="row">
+      <button class="ghost" id="btnTest">🔊 Prova audio</button>
+    </div>
+    <p class="tiny" id="diag" style="margin-top:10px;white-space:pre-wrap"></p>
+  </section>
+
+  <!-- QUESTIONS -->
+  <section id="wizard" class="card hidden">
+    <div class="progress"><div id="bar" style="width:0%"></div></div>
+    <h2 id="qTitle"></h2>
+    <p class="sub" id="qSub"></p>
+    <div id="qBody"></div>
+    <div class="row">
+      <button class="ghost" id="btnBack">← Indietro</button>
+      <button class="primary" id="btnNext">Avanti →</button>
+    </div>
+    <p class="tiny" style="margin-top:12px" id="qHint"></p>
+  </section>
+
+  <!-- STORY VIEW -->
+  <section id="story" class="card hidden">
+    <div class="row" style="margin-top:0">
+      <div class="lang">
+        <button id="langIt" class="on">IT</button>
+        <button id="langEn">EN</button>
+      </div>
+      <button class="ghost" id="btnSpeak">🔊 Ascolta</button>
+    </div>
+    <div class="page" id="pageBox"></div>
+    <div class="row">
+      <button class="ghost" id="btnPrev">←</button>
+      <span class="tiny" id="pageNum"></span>
+      <button class="primary" id="btnPageNext">→</button>
+    </div>
+    <div class="row">
+      <button class="primary" id="btnSave">💾 Salva nella libreria</button>
+      <button class="ghost" id="btnHome">Home</button>
+    </div>
+  </section>
+
+  <!-- LIBRARY -->
+  <section id="library" class="card hidden">
+    <h2>Le mie storie</h2>
+    <p class="sub" id="libEmpty">Nessuna storia ancora.</p>
+    <div id="libList"></div>
+    <div class="row">
+      <button class="ghost" id="btnExport">⬇️ Esporta</button>
+      <button class="ghost" id="btnHome2">Home</button>
+    </div>
+  </section>
+
+</main>
+
+<script>
+/* =========================================================
+   DOMANDE (uguali per tutti)
+   Ogni opzione ha i suoi pezzi di storia, in [italiano, inglese].
+   kw = parole riconosciute nelle risposte scritte.
+   ========================================================= */
+const QUESTIONS = [
+  { key:"who", it:"Chi sei?", en:"Who are you?", type:"choice", options:[
+      { emo:"", it:"Kaila", en:"Kaila", kw:["kaila"] },
+      { emo:"", it:"Atena", en:"Atena", kw:["atena"] },
+      { emo:"", it:"Achille", en:"Achille", kw:["achille"] } ] },
+
+  { key:"hero", it:"Chi è il protagonista?", en:"Who is the hero?", type:"choice", options:[
+      { emo:"🦊", it:"una volpe", en:"a fox", kw:["volpe","fox"],
+        intro:[
+          n => `C'era una volta una volpe dal pelo rossissimo, di nome ${n}. Aveva occhi furbi e un naso sempre pronto a fiutare un'avventura.`,
+          n => `Once upon a time there was a fox with a very red coat, named ${n}. Clever eyes and a nose always ready to sniff out an adventure.` ] },
+      { emo:"👧", it:"una bambina", en:"a little girl", kw:["bambin","girl","ragazz"],
+        intro:[
+          n => `C'era una volta una bambina di nome ${n}, con il cuore pieno di curiosità. Niente riusciva a fermare l'entusiasmo di ${n} quando sentiva odore di avventura.`,
+          n => `Once upon a time there was a little girl named ${n}, with a heart full of curiosity. Nothing could stop ${n}'s excitement when an adventure was near.` ] },
+      { emo:"🐉", it:"un drago", en:"a dragon", kw:["drago","dragon"],
+        intro:[
+          n => `C'era una volta un drago piccolo e un po' goffo, di nome ${n}. Sbuffava scintille quando era emozionato e sognava di volare sopra le montagne.`,
+          n => `Once upon a time there was a small, slightly clumsy dragon named ${n}. It puffed out sparks when excited and dreamed of flying over the mountains.` ] },
+      { emo:"🤖", it:"un robot", en:"a robot", kw:["robot"],
+        intro:[
+          n => `C'era una volta un piccolo robot di nome ${n}, con gli occhi a forma di lampadina. Sapeva fare tante cose, ma non aveva mai vissuto davvero un'avventura.`,
+          n => `Once upon a time there was a little robot named ${n}, with lightbulb eyes. It could do many things, but had never truly lived an adventure.` ] },
+      { emo:"🐱", it:"un gatto", en:"a cat", kw:["gatto","gatt","cat"],
+        intro:[
+          n => `C'era una volta un gatto di nome ${n}, con le zampe morbide e una gran voglia di esplorare. Di giorno dormiva al sole, ma di notte diventava il più coraggioso del quartiere.`,
+          n => `Once upon a time there was a cat named ${n}, with soft paws and a great urge to explore. By day it slept in the sun, but by night it became the bravest in the neighborhood.` ] } ] },
+
+  { key:"name", it:"Come si chiama?", en:"What is the name?", type:"text", placeholder:"Scrivi un nome…", names:["Luna","Leo","Stella","Tom"] },
+
+  { key:"place", it:"Dove vive?", en:"Where does it live?", type:"choice", options:[
+      { emo:"🌲", it:"nel bosco", en:"in the forest", kw:["bosco","foresta","forest"],
+        scene:[
+          n => `La loro casa era nel bosco, tra alberi altissimi e funghi colorati. Di giorno la luce filtrava tra le foglie come monete d'oro sparse.`,
+          n => `Their home was in the forest, among tall trees and colorful mushrooms. By day the light filtered through the leaves like scattered gold coins.` ],
+        j1:[
+          n => `Un sentiero coperto di muschio portava sempre più in profondità. Gli uccelli cantavano canzoni che nessuno conosceva.`,
+          n => `A path covered in moss led deeper and deeper. The birds sang songs nobody knew.` ],
+        j2:[
+          n => `Sotto un vecchio castagno c'era un nido abbandonato, pieno di ghiande luccicanti. Il vento tra i rami sembrava sussurrare un segreto a ${n}.`,
+          n => `Under an old chestnut tree lay an abandoned nest full of shining acorns. The wind in the branches seemed to whisper a secret to ${n}.` ],
+        j3:[
+          n => `Il bosco si fece più scuro, e il silenzio sembrò trattenere il respiro. Poi, in fondo a una radura, una luce gentile aspettava ${n}.`,
+          n => `The forest grew darker, and the silence seemed to hold its breath. Then, at the far end of a clearing, a gentle light was waiting for ${n}.` ] },
+      { emo:"🌊", it:"al mare", en:"by the sea", kw:["mare","sea","spiaggia"],
+        scene:[
+          n => `La loro casa era sulla riva del mare, dove le onde raccontavano storie a chi sapeva ascoltare. Ogni mattina il sole nasceva dall'acqua, dorato e caldo.`,
+          n => `Their home was on the seashore, where the waves told stories to anyone who knew how to listen. Every morning the sun rose from the water, golden and warm.` ],
+        j1:[
+          n => `Sulla spiaggia c'erano conchiglie di ogni forma e colore. Una di queste sembrava brillare più delle altre.`,
+          n => `Along the beach lay shells of every shape and color. One of them seemed to shine brighter than the rest.` ],
+        j2:[
+          n => `D'un tratto il mare si alzò e una barca di legno apparve all'orizzonte. Sul ponte c'era un vecchio marinaio con un cappello di paglia, che salutò ${n} con la mano.`,
+          n => `Suddenly the sea rose, and a wooden boat appeared on the horizon. On its deck stood an old sailor in a straw hat, who waved to ${n}.` ],
+        j3:[
+          n => `Le onde portarono ${n} verso una grotta misteriosa, dove l'eco ripeteva ogni parola. Dentro, l'acqua era così limpida da vedere il fondo.`,
+          n => `The waves carried ${n} toward a mysterious cave, where the echo repeated every word. Inside, the water was so clear you could see the bottom.` ] },
+      { emo:"🏙️", it:"in città", en:"in the city", kw:["città","citta","city","paese"],
+        scene:[
+          n => `La loro casa era in una città piena di rumori, di tram e di voci. Dai balconi si vedevano tetti rossi e antenne che sembravano toccare il cielo.`,
+          n => `Their home was in a busy city full of noise, trams, and voices. From the balconies you could see red roofs and antennas that seemed to touch the sky.` ],
+        j1:[
+          n => `Nelle strade si mescolavano profumi di pane caldo e di fiori. Ogni angolo nascondeva una piccola sorpresa.`,
+          n => `On the streets, the smells of warm bread and flowers mixed together. Every corner hid a small surprise.` ],
+        j2:[
+          n => `In un vicolo dimenticato c'era una porta socchiusa, con una targhetta scritta a mano: «Per chi cerca». ${n} sentì che era proprio per lui.`,
+          n => `In a forgotten alley stood a half-open door with a handwritten sign: "For those who search". ${n} felt it was meant for them.` ],
+        j3:[
+          n => `Dietro la porta si apriva una biblioteca enorme, dove i libri sussurravano indizi. Ogni scaffale portava a un nuovo mistero.`,
+          n => `Behind the door opened an enormous library, where the books whispered clues. Every shelf led to a new mystery.` ] },
+      { emo:"🚀", it:"nello spazio", en:"in space", kw:["spazio","luna","space","stelle"],
+        scene:[
+          n => `La loro casa era su un piccolo pianeta che girava piano attorno a due soli. Di notte la Via Lattea si stendeva sopra di loro come un nastro di luce.`,
+          n => `Their home was on a small planet that turned slowly around two suns. At night the Milky Way stretched above them like a ribbon of light.` ],
+        j1:[
+          n => `Sulla superficie c'erano crateri colorati e cristalli che cantavano quando il vento li sfiorava.`,
+          n => `On the surface lay colorful craters and crystals that sang whenever the wind brushed past them.` ],
+        j2:[
+          n => `Una stella cadente passò così vicina che ${n} poté sentirne il calore. Lasciò dietro di sé una scia di polvere dorata.`,
+          n => `A shooting star passed so close that ${n} could feel its warmth. It left a trail of golden dust behind it.` ],
+        j3:[
+          n => `Più lontano, sospeso nel vuoto, c'era un anello di luci che si muoveva come una danza. Sembrava una porta verso un mondo sconosciuto.`,
+          n => `Farther away, suspended in the void, a ring of lights moved like a dance. It looked like a door to an unknown world.` ] },
+      { emo:"🏰", it:"in un castello", en:"in a castle", kw:["castello","castle"],
+        scene:[
+          n => `La loro casa era un castello antico, con torri alte e corridoi pieni di ritratti. Le finestre di vetro colorato dipingevano i pavimenti di rosso, blu e verde.`,
+          n => `Their home was an ancient castle with tall towers and corridors full of portraits. Stained-glass windows painted the floors red, blue, and green.` ],
+        j1:[
+          n => `Nei sotterranei si sentivano passi lontani e l'odore di vecchie pergamene. Una scala a chiocciola scendeva ancora più giù.`,
+          n => `In the cellars, distant footsteps echoed and the air smelled of old parchment. A spiral staircase led even further down.` ],
+        j2:[
+          n => `In cima a una torre c'era una stanza piena di orologi che ticchettavano all'unisono. Uno di loro si era fermato, come se aspettasse ${n}.`,
+          n => `At the top of a tower was a room full of clocks ticking in unison. One of them had stopped, as if it were waiting for ${n}.` ],
+        j3:[
+          n => `Dal giardino del castello arrivò un canto sommesso, da dietro un muro di rose. Era il momento di scoprire chi cantava.`,
+          n => `From the castle garden came a soft song, from behind a wall of roses. It was time to find out who was singing.` ] } ] },
+
+  { key:"wish", it:"Qual è il suo desiderio?", en:"What does it want?", type:"choice", options:[
+      { emo:"💎", it:"trovare un tesoro", en:"to find a treasure", kw:["tesoro","oro","treasure"],
+        desire:[
+          n => `${n} aveva sentito una storia su un tesoro nascosto, e da quel momento non riusciva a pensare ad altro. Voleva trovarlo a ogni costo.`,
+          n => `${n} had heard a story about a hidden treasure, and since then could think of nothing else. They wanted to find it at any cost.` ],
+        quest:[
+          n => `Così ${n} preparò uno zaino con una corda, una lanterna e un quaderno per gli appunti. Il primo indizio era inciso su una foglia d'argento.`,
+          n => `So ${n} packed a bag with a rope, a lantern, and a notebook for notes. The first clue was carved on a silver leaf.` ],
+        reach:[
+          n => `Il tesoro non era fatto di oro e gioielli, ma di qualcosa di molto più prezioso. ${n} capì che il vero premio era il viaggio stesso.`,
+          n => `The treasure was not made of gold and jewels, but of something far more precious. ${n} understood that the real prize was the journey itself.` ] },
+      { emo:"🤝", it:"farsi un amico", en:"to make a friend", kw:["amic","friend"],
+        desire:[
+          n => `${n} sognava un amico con cui condividere ogni scoperta. Ma aspettare non era mai stato il suo forte.`,
+          n => `${n} dreamed of a friend to share every discovery with. But waiting had never been a strong point.` ],
+        quest:[
+          n => `Così ${n} si mise a cercare qualcuno che avesse voglia di giocare e di esplorare. Lasciò un messaggio colorato su ogni albero del sentiero.`,
+          n => `So ${n} set out to find someone who wanted to play and explore. They left a colorful message on every tree along the path.` ],
+        reach:[
+          n => `Quando finalmente arrivò una risposta, ${n} capì che l'amicizia nasce così: un passo alla volta, con un sorriso.`,
+          n => `When an answer finally came, ${n} understood that friendship grows like this: one step at a time, with a smile.` ] },
+      { emo:"🕊️", it:"volare", en:"to fly", kw:["volar","volo","fly"],
+        desire:[
+          n => `Ogni giorno ${n} guardava le nuvole e immaginava di essere lassù, tra il vento e il cielo. Voleva volare, più di ogni altra cosa.`,
+          n => `Every day ${n} watched the clouds and imagined being up there, between wind and sky. More than anything, they wanted to fly.` ],
+        quest:[
+          n => `Serviva però un modo per staccarsi da terra. ${n} cominciò a costruire ali di foglie, legno e stoffa, prova dopo prova.`,
+          n => `But there had to be a way to lift off the ground. ${n} began building wings from leaves, wood, and cloth, trial after trial.` ],
+        reach:[
+          n => `Quando il vento finalmente sollevò le ali, ${n} si sentì leggero come una piuma. Dall'alto il mondo sembrava un disegno meraviglioso.`,
+          n => `When the wind finally lifted the wings, ${n} felt as light as a feather. From above, the world looked like a wonderful drawing.` ] },
+      { emo:"🏆", it:"vincere una gara", en:"to win a race", kw:["gara","vincere","race","corsa"],
+        desire:[
+          n => `${n} aveva deciso di partecipare alla grande gara del paese, quella che si correva ogni anno sotto la luna. Voleva vincere, e dimostrare di potercela fare.`,
+          n => `${n} had decided to enter the great race of the village, the one run every year under the moon. They wanted to win, and to prove they could do it.` ],
+        quest:[
+          n => `Ogni giorno ${n} si allenava: correva lungo il fiume, saltava i muretti e ripassava le curve più strette. La sfida era sempre più vicina.`,
+          n => `Every day ${n} trained: running along the river, jumping over walls, and practicing the tightest turns. The challenge was getting closer.` ],
+        reach:[
+          n => `Quando tagliò il traguardo, ${n} non riusciva a crederci. Ma la cosa più bella era l'applauso di tutti, anche di chi aveva perso.`,
+          n => `When they crossed the finish line, ${n} could hardly believe it. But the best part was the applause from everyone, even those who had lost.` ] } ] },
+
+  { key:"obstacle", it:"Chi o cosa glielo rende difficile?", en:"What makes it hard?", type:"choice", options:[
+      { emo:"🌪️", it:"una tempesta", en:"a storm", kw:["tempesta","vento","storm","pioggia"],
+        conflict:[
+          n => `All'improvviso il cielo si oscurò e una tempesta si scatenò. Il vento urlava tra gli alberi e la pioggia cadeva a secchi.`,
+          n => `Suddenly the sky darkened and a storm broke loose. The wind howled through the trees and the rain poured down in buckets.` ],
+        turn:[
+          n => `${n} si riparò dietro una roccia e pensò a lungo. Ogni tentativo sembrava inutile, finché non notò una strada nascosta tra le radici.`,
+          n => `${n} took shelter behind a rock and thought hard. Every attempt seemed useless, until they noticed a hidden path between the roots.` ] },
+      { emo:"👹", it:"un mostro gentile", en:"a kind monster", kw:["mostro","monster"],
+        conflict:[
+          n => `Sulla strada apparve un mostro enorme, con occhi gialli e denti grandi come pale. Ma quando parlò, la sua voce era sorprendentemente dolce.`,
+          n => `On the path appeared an enormous monster with yellow eyes and teeth as big as shovels. But when it spoke, its voice was surprisingly gentle.` ],
+        turn:[
+          n => `${n} capì che il mostro era solo timido e aveva paura di essere cacciato. Con calma gli chiese perché fosse lì, e il mostro cominciò a raccontare.`,
+          n => `${n} realized the monster was only shy and afraid of being chased away. Calmly, they asked why it was there, and the monster began to tell its story.` ] },
+      { emo:"🧩", it:"un enigma difficile", en:"a tricky riddle", kw:["enigma","indovinello","riddle"],
+        conflict:[
+          n => `Davanti a ${n} si ergeva una porta con un enigma inciso nella pietra: «Più cresco, più divento piccolo. Che cosa sono?»`,
+          n => `In front of ${n} stood a door with a riddle carved in stone: "The more I grow, the smaller I get. What am I?"` ],
+        turn:[
+          n => `${n} rifletté a lungo, sussurrando parole diverse. Poi la risposta arrivò, chiara come l'acqua: una candela, che si consuma mentre illumina.`,
+          n => `${n} thought for a long time, whispering different words. Then the answer came, clear as water: a candle, which wears down while it lights the way.` ] },
+      { emo:"🌑", it:"il buio", en:"the darkness", kw:["buio","notte","dark"],
+        conflict:[
+          n => `Il buio calò così fitto che ${n} non riusciva a vedere nemmeno le proprie mani. Ogni rumore sembrava un passo alle spalle.`,
+          n => `The darkness fell so thick that ${n} could not even see their own hands. Every sound seemed like a footstep behind them.` ],
+        turn:[
+          n => `${n} accese la lanterna e trovò il coraggio di guardare dentro al buio. Lì, a pochi passi, brillava una piccola luce che li stava aspettando.`,
+          n => `${n} lit the lantern and found the courage to look into the dark. There, a few steps away, a small light was waiting.` ] } ] },
+
+  { key:"helper", it:"Chi o cosa lo aiuta?", en:"Who or what helps?", type:"choice", options:[
+      { emo:"🐢", it:"una tartaruga parlante", en:"a talking turtle", kw:["tartaruga","turtle"],
+        meet:[
+          n => `Al bivio ${n} incontrò una tartaruga con il guscio decorato di stelle. «Aspetto qui da tanto tempo», disse con calma, «ma conosco la strada giusta».`,
+          n => `At the crossroads ${n} met a turtle with a shell decorated with stars. "I have been waiting here a long time," it said calmly, "but I know the right way."` ],
+        help:[
+          n => `La tartaruga spiegò che il sentiero giusto era quello più lento. «Chi va piano vede di più», disse, e insieme ripresero il cammino.`,
+          n => `The turtle explained that the right path was the slowest one. "Those who go slowly see more," it said, and together they set off again.` ] },
+      { emo:"🪄", it:"una bacchetta magica", en:"a magic wand", kw:["bacchetta","magi","wand"],
+        meet:[
+          n => `Tra le pietre di un vecchio sentiero ${n} trovò una bacchetta magica, avvolta in un panno di seta. Appena la toccò, le sue punte si accesero di un azzurro gentile.`,
+          n => `Among the stones of an old path, ${n} found a magic wand wrapped in silk. As soon as they touched it, its tips glowed a gentle blue.` ],
+        help:[
+          n => `La bacchetta sussurrò: «Il vero incantesimo è crederci». Ogni volta che ${n} la agitava, un piccolo ponte di luce compariva davanti ai passi.`,
+          n => `The wand whispered: "The real spell is believing." Every time ${n} waved it, a little bridge of light appeared before their steps.` ] },
+      { emo:"🧑‍🤝‍🧑", it:"un nuovo amico", en:"a new friend", kw:["amico","friend"],
+        meet:[
+          n => `Mentre ${n} camminava, un bambino dai capelli arruffati saltò fuori da dietro un cespuglio. «Ti serve una mano?», chiese con un sorriso largo.`,
+          n => `As ${n} walked on, a child with messy hair jumped out from behind a bush. "Do you need a hand?" they asked with a wide smile.` ],
+        help:[
+          n => `Il nuovo amico conosceva ogni scorciatoia e rideva di gusto a ogni indovinello. Insieme trovarono in fretta quello che cercavano.`,
+          n => `The new friend knew every shortcut and laughed heartily at every riddle. Together they quickly found what they were looking for.` ] },
+      { emo:"🦉", it:"un gufo saggio", en:"a wise owl", kw:["gufo","owl","civetta"],
+        meet:[
+          n => `Su un ramo alto un gufo grigio li osservava con occhi enormi e attenti. «So chi cerca la strada», disse con voce profonda, «e so che ce la farai».`,
+          n => `On a high branch, a gray owl watched them with huge, attentive eyes. "I know who is looking for the way," it said in a deep voice, "and I know you will make it."` ],
+        help:[
+          n => `Il gufo volò accanto a ${n} e indicò con l'ala il sentiero giusto. Lungo il tragitto raccontò storie antiche, che tenevano il coraggio sempre acceso.`,
+          n => `The owl flew beside ${n} and pointed with one wing toward the right path. Along the way it told ancient stories that kept courage burning bright.` ] } ] },
+
+  { key:"ending", it:"Come finisce?", en:"How does it end?", type:"choice", options:[
+      { emo:"🎉", it:"con una festa", en:"with a party", kw:["festa","party"],
+        close:[
+          n => `Quando tutto fu compiuto, il paese preparò una grande festa in onore di ${n}. C'erano lanterne colorate, musica e dolci per tutti.`,
+          n => `When everything was done, the village prepared a great party in honor of ${n}. There were colorful lanterns, music, and sweets for everyone.` ] },
+      { emo:"🌈", it:"con una sorpresa", en:"with a surprise", kw:["sorpresa","surprise"],
+        close:[
+          n => `Quando ${n} tornò a casa, una sorpresa lo aspettava: un regalo avvolto in carta dorata, con un biglietto che diceva «Grazie».`,
+          n => `When ${n} came home, a surprise was waiting: a gift wrapped in golden paper, with a note that said "Thank you".` ] },
+      { emo:"😊", it:"tutti felici", en:"everyone happy", kw:["felic","happy","contenti"],
+        close:[
+          n => `Quella sera tutti gli amici si ritrovarono a ridere sotto le stelle. Nessuno ricordava più le difficoltà, solo il bel viaggio fatto insieme.`,
+          n => `That evening all the friends gathered to laugh under the stars. Nobody remembered the difficulties anymore, only the wonderful journey they had shared.` ] } ] },
+
+  { key:"length", it:"Quanto deve durare la lettura?", en:"How long should the reading be?", type:"choice", options:[
+      { emo:"🌙", it:"breve (circa 3 minuti)", en:"short (about 3 minutes)", kw:["breve","corta","3","tre","short"], pages:6, level:0 },
+      { emo:"📖", it:"media (circa 5 minuti)", en:"medium (about 5 minutes)", kw:["media","medio","5","cinque","medium"], pages:8, level:1 },
+      { emo:"📚", it:"lunga (circa 8 minuti)", en:"long (about 8 minutes)", kw:["lunga","lungo","8","otto","long"], pages:10, level:2 } ] }
+];
+
+/* Pezzi comuni a tutte le storie */
+const GEN1 = [
+  n => `${n} continuò a camminare, un passo dopo l'altro. Ogni tanto si fermava a guardare il cielo, che cambiava colore come in un quadro.`,
+  n => `${n} kept walking, one step after another. Every so often they stopped to look at the sky, which changed color like a painting.`
+];
+const GEN2 = [
+  n => `Il cuore batteva forte, ma la meta era sempre più vicina. Ogni ostacolo superato rendeva ${n} un po' più forte.`,
+  n => `The heart beat fast, but the goal was closer and closer. Every obstacle overcome made ${n} a little stronger.`
+];
+const FINAL = [
+  (n, w) => `Quella notte, quando le stelle tornarono a brillare, ${n} si addormentò con un sorriso. Questa storia l'ha inventata ${w}, e la prossima volta sarà ancora diversa.`,
+  (n, w) => `That night, as the stars shone again, ${n} fell asleep with a smile. This story was invented by ${w}, and next time it will be different again.`
+];
+const PAGE_EMOJI = ["🌙","⭐","🗺️","🌈","🌟","🍃","🎵","🌻","💫","🏡","🕯️","🌧️"];
+
+/* ---------- Stato ---------- */
+let answers = {};
+let step = 0;
+let currentStory = null;
+let lang = "it";
+let page = 0;
+
+const $ = id => document.getElementById(id);
+const show = id => {
+  ["home","wizard","story","library"].forEach(s => $(s).classList.add("hidden"));
+  $(id).classList.remove("hidden");
+  window.scrollTo(0,0);
+};
+
+/* Achille usa le immagini (la prima domanda è sempre con le icone) */
+const isLittle = () => answers.who === 2;
+
+/* ---------- Voce ---------- */
+let voices = [];
+function loadVoices() { if ("speechSynthesis" in window) voices = speechSynthesis.getVoices(); }
+if ("speechSynthesis" in window) {
+  loadVoices();
+  speechSynthesis.onvoiceschanged = loadVoices;
+}
+
+function speak(text, language) {
+  if (!("speechSynthesis" in window)) {
+    alert("Questo dispositivo non supporta la lettura ad alta voce.");
+    return;
+  }
+  const code = language === "en" ? "en" : "it";
+  // La lettura parte subito, dentro il tocco: così iPhone e Android non la bloccano
+  speechSynthesis.cancel();
+  const v = speechSynthesis.getVoices().find(x => x.lang.toLowerCase().startsWith(code));
+  // Testo spezzato in frasi: molti browser interrompono le letture lunghe
+  const parts = text.match(/[^.!?…]+[.!?…]+["»]?|[^.!?…]+$/g) || [text];
+  parts.forEach(part => {
+    const s = part.trim();
+    if (!s) return;
+    const u = new SpeechSynthesisUtterance(s);
+    u.lang = code === "en" ? "en-GB" : "it-IT";
+    if (v) u.voice = v;
+    u.rate = 0.9;
+    u.onerror = e => {
+      if (e.error !== "interrupted" && e.error !== "canceled")
+        alert("Non riesco a leggere ad alta voce su questo dispositivo. Controlla il volume o la voce del telefono.");
+    };
+    speechSynthesis.speak(u);
+  });
+}
+
+/* ---------- Domande ---------- */
+function renderQuestion() {
+  const q = QUESTIONS[step];
+  $("bar").style.width = (step / QUESTIONS.length * 100) + "%";
+  $("qTitle").textContent = q.it;
+  $("qSub").textContent = q.en;
+  const body = $("qBody");
+  body.innerHTML = "";
+  const imageMode = q.key === "who" || isLittle();
+  $("qHint").textContent = imageMode ? "Tocca un'immagine per sentirne il nome." : "";
+
+  if (q.type === "text") {
+    if (isLittle()) {
+      const wrap = document.createElement("div");
+      wrap.className = "chips";
+      q.names.forEach(n => {
+        const b = document.createElement("button");
+        b.className = "chip" + (answers.name === n ? " selected" : "");
+        b.textContent = n;
+        b.onclick = () => { answers.name = n; renderQuestion(); };
+        wrap.appendChild(b);
+      });
+      body.appendChild(wrap);
+    } else {
+      const input = document.createElement("input");
+      input.type = "text";
+      input.placeholder = q.placeholder;
+      input.value = typeof answers[q.key] === "string" ? answers[q.key] : "";
+      input.id = "freeInput";
+      body.appendChild(input);
+    }
+  } else if (q.key === "who" || isLittle()) {
+    const wrap = document.createElement("div");
+    wrap.className = "choices";
+    q.options.forEach((opt, i) => {
+      const b = document.createElement("button");
+      b.className = "choice" + (answers[q.key] === i ? " selected" : "");
+      b.innerHTML = (opt.emo ? `<span class="emo">${opt.emo}</span>` : "") + opt.it;
+      b.onclick = () => {
+        answers[q.key] = i;
+        speak(opt.it, "it");
+        renderQuestion();
+      };
+      wrap.appendChild(b);
+    });
+    body.appendChild(wrap);
+  } else {
+    const input = document.createElement("input");
+    input.type = "text";
+    input.id = "freeInput";
+    input.placeholder = "Scrivi la tua risposta… es. " + q.options.map(o => o.it).slice(0, 3).join(", ");
+    input.value = typeof answers[q.key] === "string" ? answers[q.key] : "";
+    body.appendChild(input);
+  }
+
+  // Achille può comunque scrivere la risposta da sé
+  if (isLittle() && q.key !== "who" && !body.querySelector("#freeInput")) {
+    const input = document.createElement("input");
+    input.type = "text";
+    input.id = "freeInput";
+    input.placeholder = "Oppure scrivi tu la risposta…";
+    input.value = typeof answers[q.key] === "string" ? answers[q.key] : "";
+    input.style.marginTop = "14px";
+    body.appendChild(input);
+  }
+
+  $("btnBack").style.visibility = step === 0 ? "hidden" : "visible";
+  $("btnNext").textContent = step === QUESTIONS.length - 1 ? "Crea la storia ✨" : "Avanti →";
+}
+
+function captureText() {
+  const input = $("freeInput");
+  if (input && input.value.trim()) answers[QUESTIONS[step].key] = input.value.trim();
+}
+
+function canProceed() {
+  const q = QUESTIONS[step];
+  const v = answers[q.key];
+  if (typeof v === "string") return v.length > 0;
+  return v !== undefined;
+}
+
+$("btnNext").onclick = () => {
+  captureText();
+  if (!canProceed()) { alert("Scegli un'opzione o scrivi la risposta 🙂"); return; }
+  if (step < QUESTIONS.length - 1) { step++; renderQuestion(); }
+  else buildStory();
+};
+$("btnBack").onclick = () => { captureText(); if (step > 0) { step--; renderQuestion(); } };
+
+/* Risolve la risposta: scelta (numero) oppure testo libero riconosciuto per parole chiave.
+   Se il testo non è riconosciuto, si usa la prima opzione, con il testo scritto dove possibile. */
+function resolve(key, def = 0) {
+  const q = QUESTIONS.find(x => x.key === key);
+  const v = answers[key];
+  if (typeof v === "number") return q.options[v];
+  const t = (v || "").toLowerCase();
+  const found = q.options.find(o => o.kw.some(k => t.includes(k)));
+  if (found) return found;
+  const base = q.options[def];
+  if (key === "hero") return { ...base, intro: [
+    n => `C'era una volta ${n}, ${v}, pieno di sogni.`,
+    n => `Once upon a time there was ${n}, ${v}, full of dreams.` ] };
+  if (key === "wish") return { ...base, desire: [
+    n => `${n} desiderava ${v} con tutto il cuore.`,
+    n => `${n} longed for ${v} with all their heart.` ] };
+  return base;
+}
+
+/* ---------- Costruzione della storia ---------- */
+/* Divide le scene in N pagine, il più equamente possibile */
+function chunk(arr, n) {
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const s = Math.floor(i * arr.length / n), e = Math.floor((i + 1) * arr.length / n);
+    if (e > s) out.push(arr.slice(s, e));
+  }
+  return out;
+}
+
+function buildStory() {
+  const who = resolve("who"), hero = resolve("hero"), place = resolve("place"),
+        wish = resolve("wish"), obs = resolve("obstacle"), help = resolve("helper", 0),
+        end = resolve("ending"), len = resolve("length", 1);
+  const name = answers.name;
+  const whoLabel = [who.it, who.en];
+
+  // Tutte le scene, in ordine. level = dalla quale lunghezza compare
+  const scenes = [
+    { level:0, f: li => hero.intro[li](name) },
+    { level:0, f: li => place.scene[li](name) },
+    { level:0, f: li => wish.desire[li](name) },
+    { level:1, f: li => place.j1[li](name) },
+    { level:0, f: li => wish.quest[li](name) },
+    { level:1, f: li => place.j2[li](name) },
+    { level:0, f: li => obs.conflict[li](name) },
+    { level:1, f: li => GEN1[li](name) },
+    { level:0, f: li => help.meet[li](name) },
+    { level:2, f: li => place.j3[li](name) },
+    { level:0, f: li => obs.turn[li](name) },
+    { level:0, f: li => help.help[li](name) },
+    { level:2, f: li => GEN2[li](name) },
+    { level:0, f: li => wish.reach[li](name) },
+    { level:0, f: li => end.close[li](name) },
+    { level:0, f: li => FINAL[li](name, whoLabel[li]) }
+  ].filter(s => s.level <= len.level);
+
+  // Pagine: ogni pagina raccoglie più paragrafi, in italiano e in inglese
+  const groups = chunk(scenes, len.pages);
+  const pages = groups.map((g, i) => ({
+    emo: i === 0 ? hero.emo : PAGE_EMOJI[i % PAGE_EMOJI.length],
+    it: g.map(s => s.f(0)).join("\n\n"),
+    en: g.map(s => s.f(1)).join("\n\n")
+  }));
+
+  currentStory = {
+    id: Date.now(),
+    title: `${name} – ${hero.it} (di ${who.it})`,
+    createdAt: new Date().toISOString(),
+    pages
+  };
+  page = 0; lang = "it";
+  renderPage();
+  show("story");
+}
+
+function renderPage() {
+  const p = currentStory.pages[page];
+  const paras = p[lang].split("\n\n").map(t => `<p>${t}</p>`).join("");
+  $("pageBox").innerHTML = `<div class="big">${p.emo}</div>${paras}`;
+  $("pageNum").textContent = `${page+1} / ${currentStory.pages.length}`;
+  $("langIt").classList.toggle("on", lang === "it");
+  $("langEn").classList.toggle("on", lang === "en");
+  $("btnPrev").style.visibility = page === 0 ? "hidden" : "visible";
+  $("btnPageNext").textContent = page === currentStory.pages.length - 1 ? "Fine" : "→";
+}
+
+$("langIt").onclick = () => { lang = "it"; renderPage(); };
+$("langEn").onclick = () => { lang = "en"; renderPage(); };
+$("btnSpeak").onclick = () => speak(currentStory.pages[page][lang], lang);
+$("btnPrev").onclick = () => { if (page > 0) { page--; renderPage(); } };
+$("btnPageNext").onclick = () => {
+  if (page < currentStory.pages.length - 1) { page++; renderPage(); }
+  else show("home");
+};
+
+/* ---------- Libreria (salvata nel browser) ---------- */
+const KEY = "creatore-storie-library-v1";
+const loadLib = () => JSON.parse(localStorage.getItem(KEY) || "[]");
+const saveLib = lib => localStorage.setItem(KEY, JSON.stringify(lib));
+
+$("btnSave").onclick = () => {
+  const lib = loadLib();
+  lib.unshift(currentStory);
+  saveLib(lib);
+  alert("Storia salvata nella libreria! 📚");
+};
+
+function renderLibrary() {
+  const lib = loadLib();
+  const list = $("libList");
+  list.innerHTML = "";
+  $("libEmpty").classList.toggle("hidden", lib.length > 0);
+  lib.forEach(s => {
+    const row = document.createElement("div");
+    row.className = "list-item";
+    const title = document.createElement("span");
+    title.textContent = s.title;
+    title.onclick = () => { currentStory = s; page = 0; lang = "it"; renderPage(); show("story"); };
+    const del = document.createElement("button");
+    del.className = "danger";
+    del.textContent = "🗑️";
+    del.onclick = () => {
+      if (!confirm("Eliminare questa storia?")) return;
+      saveLib(loadLib().filter(x => x.id !== s.id));
+      renderLibrary();
+    };
+    row.append(title, del);
+    list.appendChild(row);
+  });
+}
+
+$("btnExport").onclick = () => {
+  const blob = new Blob([JSON.stringify(loadLib(), null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "storie.json";
+  a.click();
+};
+
+/* ---------- Prova audio: la diagnosi compare nella pagina, senza avvisi ---------- */
+$("btnTest").onclick = () => {
+  const d = $("diag");
+  if (!("speechSynthesis" in window)) {
+    d.textContent = "Versione app v6. Questo browser non supporta la lettura vocale.";
+    return;
+  }
+  const all = speechSynthesis.getVoices();
+  const itVoice = all.find(x => x.lang.toLowerCase().startsWith("it"));
+  d.textContent = `Versione app v6. Voci trovate: ${all.length}. Voce italiana: ${itVoice ? itVoice.name : "nessuna"}.`;
+  const u = new SpeechSynthesisUtterance("Ciao! Questa è una prova della voce.");
+  u.lang = "it-IT";
+  if (itVoice) u.voice = itVoice;
+  u.onstart = () => { d.textContent += " Lettura avviata."; };
+  u.onend = () => { d.textContent += " Lettura terminata."; };
+  u.onerror = e => { d.textContent += ` Errore: ${e.error}.`; };
+  speechSynthesis.cancel();
+  speechSynthesis.speak(u);
+};
+
+/* ---------- Navigazione ---------- */
+$("btnNew").onclick = () => { answers = {}; step = 0; renderQuestion(); show("wizard"); };
+$("btnLibrary").onclick = () => { renderLibrary(); show("library"); };
+$("btnHome").onclick = () => show("home");
+$("btnHome2").onclick = () => show("home");
+
+/* ---------- PWA ---------- */
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+</script>
+</body>
+</html>

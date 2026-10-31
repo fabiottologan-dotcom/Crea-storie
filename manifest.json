@@ -1,0 +1,12 @@
+{
+  "name": "Creatore di storie",
+  "short_name": "Storie",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#fff8ec",
+  "theme_color": "#7c5cff",
+  "lang": "it",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
